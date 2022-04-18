@@ -1,0 +1,108 @@
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_scoredf =
+d=pd.read_csv('german_credit_data.csv')
+d[['Sex']] = d[['Sex']].replace(to_replace={'female':1,'male':0})
+d[['Housing']] = d[['Housing']].replace(to_replace={'own':0,'free':1,'rent':2})
+d[['Saving accounts','Checking account']] = d[['Saving accounts','Checking account']].replace(to_replace={'little':0,'moderate':1,'rich':2,'quite rich':3})
+d[['Purpose']] = d[['Purpose']].replace(to_replace={'car':0,'radio/TV':1,'furniture/equipment':2,'business':3,'education':4,'repairs':5,'vacation/others':6,'domestic appliances':7})
+d[['Class']]=d[['Class']].replace(to_replace={'Normal':1,'Fraud':0})
+d.drop('id',axis=1,inplace=True)
+d.rename(columns={'Saving accounts':'Saving'},inplace=True)
+d.rename(columns={'Checking account':'Checking'},inplace=True)
+d['Sex'].fillna(d.Sex.mean(),inplace= True)
+d['Housing'].fillna(d.Housing.mean(),inplace= True)
+d['Saving'].fillna(d.Saving.mean(),inplace= True)
+d['Checking'].fillna(d.Checking.mean(),inplace= True)
+d['Purpose'].fillna(d.Purpose.mean(),inplace= True)
+d['Duration'].fillna(d.Duration.mean(),inplace= True)
+#Converting words to integer values:
+d = d.astype({'Age':'int','Sex':'int','Job':'int','Housing':'int','Saving':'int','Checking':'int','Credit amount':'int','Duration':'int','Purpose':'int','Class':'int'})
+cols_to_retain=['Age','Sex','Job','Housing','Saving','Checking','Credit amount','Duration','Purpose','Class']
+for col in d.columns:
+if col not in cols_to_retain :
+del d[col]
+x = d.iloc[:,:-2]
+y = d.iloc[:,-1]
+x_train, x_test, y_train, y_test = train_test_split(x,y, test_size=0.25, random_state=10)
+rfc=RandomForestClassifier()
+rfc.fit(x_train,y_train)
+y_pred = rfc.predict(x_test)
+#print("Accuracy of the Model: {0}%".format(accuracy_score(y_test, y_pred)*100))
+import pickle
+pickle.dump(rfc, open('model.pkl','wb'))
+from flask import Flask, render_template, request
+import pickle
+from sklearn.ensemble import RandomForestClassifier
+app=Flask(__name__)
+@app.route('/')
+def front():
+return render_template('front.html')
+@app.route('/predict',methods=['POST'])
+def predict():
+if request.method == 'POST':
+age=request.form['age']
+sex=request.form['sex']
+if sex=='FeMale':
+sex1=1
+else:
+sex1=0
+job=request.form['job']
+housing=request.form['housing']
+if housing=='own':
+housing=0
+elif housing=='free':
+housing=1
+else:
+housing=2
+saving_account=request.form['saving_account']
+if saving_account=='little':
+saving_account=0
+elif saving_account=='moderate':
+saving_account=1
+elif saving_account=='rich':
+saving_account=2
+else:
+saving_account=3
+checking_account=request.form['check_acc']
+if checking_account=='little':
+checking_account=0
+elif checking_account=='moderate':
+checking_account=1
+elif checking_account=='rich':
+checking_account=2
+else:
+checking_account=3
+credit_amount=request.form['amount']
+duration=request.form['duration']
+purpose=request.form['purpose']
+if purpose=='car':
+purpose1=0
+elif purpose=='radio/TV':
+purpose1=1
+elif purpose=='furniture/equipment':
+purpose1=2
+elif purpose=='business':
+purpose1=3
+elif purpose=='education':
+purpose1=4
+elif purpose=='repairs':
+purpose1=5
+elif purpose=='vacation/others':
+purpose1=6
+else:
+purpose1=7
+data=[[int(age),int(sex1),int(job),int(housing),int(saving_account),int(checking_account),int(credit_amount),int(purpose1)]]
+print(data)
+rfc=pickle.load(open('model.pkl','rb'))
+prediction_res=rfc.predict(data)[0]
+if(prediction_res==1):
+pred="NORMAL TRANSACTION"
+else:
+pred="FRAUD TRANSACTION"
+return render_template('front.html',prediction=pred)
+if __name__ =='__main__':
+app.debug = True
+app.run()
